@@ -1,0 +1,14 @@
+[Unit]
+Description=nootifications bot
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Restart=always
+RuntimeMaxSec=600
+WorkingDirectory=/home/suki/scripts/nootifications/
+ExecStart=/usr/bin/python3 ./nootifications.py
+
+[Install]
+WantedBy=multi-user.target
+

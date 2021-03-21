@@ -1,0 +1,4 @@
+requests==2.22.0
+python_telegram_bot==11.1.0
+kraken_wsclient_py==0.0.9
+telegram==0.0.1
