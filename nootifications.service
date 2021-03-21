@@ -5,7 +5,7 @@ StartLimitIntervalSec=0
 
 [Service]
 Restart=always
-RuntimeMaxSec=600
+RuntimeMaxSec=3600
 WorkingDirectory=/home/suki/scripts/nootifications/
 ExecStart=/usr/bin/python3 ./nootifications.py
 

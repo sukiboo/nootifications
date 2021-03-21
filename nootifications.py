@@ -1,3 +1,8 @@
+'''
+monitor prices of the selected cryptocurrencies and send telegram notifications
+if the price changes by the specified margin
+'''
+
 
 from kraken_wsclient_py import kraken_wsclient_py
 import telegram
@@ -26,7 +31,6 @@ class CryptoNoot:
                 price = requests.get(url + ticker).json()['result'][ticker]['c'][0]
                 self.log_price[ticker] = float(price)
             json.dump(self.log_price, open(self.price_log, 'w+'))
-        self.send_nootification(self.log_price)
 
     def start_websocket(self):
         client = kraken_wsclient_py.WssClient()
@@ -43,7 +47,6 @@ class CryptoNoot:
             pass
 
     def check_price(self, ticker, price):
-        print(f'{ticker} = {price:.2f}')
         change = abs(price / self.log_price[ticker] - 1)
         if change > self.margin:
             direction = 'up' if price > self.log_price[ticker] else 'down'
@@ -55,7 +58,6 @@ class CryptoNoot:
         json.dump(self.log_price, open(self.price_log, 'w+'))
 
     def send_nootification(self, message):
-        # print(f'message to telegram: {message}')
         telegram.Bot(self.bot_token).send_message(self.contact, str(message))
 
 
