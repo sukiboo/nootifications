@@ -13,7 +13,7 @@ import json
 class CryptoNoot:
 
     def __init__(self):
-        self.margin = .01
+        self.margin = .025
         self.tickers = {'ETH/USD': 'eth', 'XBT/USD': 'btc'}
         self.contact = 'REDACTED_CHAT_ID'
         self.bot_token = 'REDACTED_TOKEN'
