@@ -92,8 +92,9 @@ class Settings:
 class PriceStateManager:
     """Manages persistent price state for crash recovery."""
 
-    def __init__(self, state_file: str | Path = "log_prices.json") -> None:
+    def __init__(self, state_file: str | Path = "logs/prices_log.json") -> None:
         self.state_file = Path(state_file)
+        self.state_file.parent.mkdir(parents=True, exist_ok=True)
         self.state = self._load_state()
 
     def _load_state(self) -> PriceState:
