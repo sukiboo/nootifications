@@ -1,0 +1,122 @@
+import json
+import logging
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+import yaml
+
+from src.schemas import AppConfig, EnvSettings, PriceState
+
+
+class UTCFormatter(logging.Formatter):
+    def formatTime(self, record: logging.LogRecord, datefmt: str | None = None) -> str:
+        ct = time.gmtime(record.created)
+        if datefmt:
+            return time.strftime(datefmt, ct) + "Z"
+        return time.strftime("%Y-%m-%d %H:%M:%S", ct) + "Z"
+
+
+def setup_logger(
+    name: str = "",
+    log_dir: str = "logs",
+    level: int = logging.INFO,
+    console_level: int | None = None,
+) -> logging.Logger:
+    """
+    Configure and return a logger with file and console handlers.
+
+    Args:
+        name: Logger name (empty string for root logger)
+        log_dir: Directory for log files
+        level: Logging level for file handler
+        console_level: Logging level for console (defaults to same as level)
+
+    Returns:
+        Configured logger
+    """
+    Path(log_dir).mkdir(parents=True, exist_ok=True)
+    log_file = Path(log_dir) / f"{datetime.now(timezone.utc).strftime('%Y-%m')}.log"
+
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.DEBUG)
+    logger.handlers.clear()
+
+    formatter = UTCFormatter(
+        fmt="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+    # File handler
+    file_handler = logging.FileHandler(log_file, encoding="utf-8")
+    file_handler.setLevel(level)
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+
+    # Console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(console_level or level)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+
+    # Silence noisy third-party loggers
+    for lib in ["telegram", "telegram.ext", "httpx", "httpcore", "aiohttp", "websockets"]:
+        logging.getLogger(lib).setLevel(logging.WARNING)
+
+    return logger
+
+
+class Settings:
+    """Unified settings manager for app config and environment variables."""
+
+    def __init__(self, config_path: str | Path = "settings.yaml") -> None:
+        self.env = EnvSettings()  # type: ignore[call-arg]
+        self.app = self._load_yaml_config(config_path)
+
+    def _load_yaml_config(self, config_path: str | Path) -> AppConfig:
+        """Load and validate the YAML configuration file."""
+        path = Path(config_path)
+        if not path.exists():
+            raise FileNotFoundError(f"Configuration file not found: {config_path}")
+
+        with open(path, encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+
+        return AppConfig(**data)
+
+    @property
+    def bot_name(self) -> str:
+        return self.app.bot_name
+
+
+class PriceStateManager:
+    """Manages persistent price state for crash recovery."""
+
+    def __init__(self, state_file: str | Path = "log_prices.json") -> None:
+        self.state_file = Path(state_file)
+        self.state = self._load_state()
+
+    def _load_state(self) -> PriceState:
+        """Load state from disk or create empty state."""
+        if self.state_file.exists():
+            try:
+                with open(self.state_file, encoding="utf-8") as f:
+                    data = json.load(f)
+                return PriceState(**data)
+            except (json.JSONDecodeError, ValueError):
+                pass
+        return PriceState()
+
+    def save(self) -> None:
+        """Persist current state to disk."""
+        with open(self.state_file, "w", encoding="utf-8") as f:
+            json.dump(self.state.model_dump(), f, indent=2)
+
+    def get_price(self, ticker: str) -> float | None:
+        """Get last recorded price for a ticker."""
+        return self.state.get_price(ticker)
+
+    def set_price(self, ticker: str, price: float) -> None:
+        """Update price for a ticker and persist."""
+        self.state.set_price(ticker, price)
+        self.save()

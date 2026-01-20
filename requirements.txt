@@ -1,0 +1,8 @@
+# Core
+python-telegram-bot>=21.0
+pydantic>=2.0
+pydantic-settings>=2.0
+pyyaml>=6.0
+
+# Kraken WebSocket
+python-kraken-sdk>=3.2.0
