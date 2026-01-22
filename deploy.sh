@@ -29,7 +29,7 @@ if [[ ${#MISSING_VARS[@]} -gt 0 ]]; then
 fi
 
 echo "==> 📦 Pull latest code on server"
-ssh "${SERVER_USER}@${SERVER_HOST}" << EOF >/dev/null 2>&1
+ssh "${SERVER_USER}@${SERVER_HOST}" << EOF
 set -euo pipefail
 APPDIR="\$HOME/${SERVER_PATH}"
 
@@ -40,8 +40,7 @@ else
   # Only do git operations if repo already exists
   git -C "\$APPDIR" fetch --prune --tags >/dev/null
   # checkout default branch and pull
-  DEFAULT_BRANCH=\$(git -C "\$APPDIR" remote show origin 2>/dev/null | awk '/HEAD branch/ {print \$NF}')
-  DEFAULT_BRANCH=\${DEFAULT_BRANCH:-main}
+  DEFAULT_BRANCH="v2"
   git -C "\$APPDIR" checkout -q "\$DEFAULT_BRANCH"
   git -C "\$APPDIR" pull --ff-only >/dev/null
 fi
