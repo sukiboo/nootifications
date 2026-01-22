@@ -71,7 +71,7 @@ class NootificationsBot:
         try:
             # Send startup notification
             await self.notifier.send(
-                f"🔆 {self.settings.bot_name} started\nMonitoring {len(self._monitors)} assets"
+                f"🔆 {self.settings.bot_name}: monitoring {len(self._monitors)} assets"
             )
 
             # Start all clients

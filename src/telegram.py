@@ -20,7 +20,7 @@ class TelegramNotifier:
         try:
             await self.bot.send_message(
                 chat_id=self.user_id,
-                text=f"```\n{message}\n```",
+                text=f"`{message}`",
                 disable_notification=silent,
                 parse_mode="Markdown",
             )
