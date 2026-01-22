@@ -39,8 +39,9 @@ if [[ ! -d "\$APPDIR/.git" ]]; then
 else
   # Only do git operations if repo already exists
   git -C "\$APPDIR" fetch --prune --tags >/dev/null
-  # checkout default branch (origin/HEAD) and pull
-  DEFAULT_BRANCH=\$(git -C "\$APPDIR" rev-parse --abbrev-ref origin/HEAD | sed "s|origin/||")
+  # checkout default branch and pull
+  DEFAULT_BRANCH=\$(git -C "\$APPDIR" remote show origin 2>/dev/null | awk '/HEAD branch/ {print \$NF}')
+  DEFAULT_BRANCH=\${DEFAULT_BRANCH:-main}
   git -C "\$APPDIR" checkout -q "\$DEFAULT_BRANCH"
   git -C "\$APPDIR" pull --ff-only >/dev/null
 fi
