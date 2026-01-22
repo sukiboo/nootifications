@@ -70,8 +70,8 @@ class NootificationsBot:
 
         try:
             # Send startup notification
-            await self.notifier.send_info(
-                f"{self.settings.bot_name} started\\n" f"Monitoring {len(self._monitors)} assets"
+            await self.notifier.send(
+                f"🔆 {self.settings.bot_name} started\nMonitoring {len(self._monitors)} assets"
             )
 
             # Start all clients
@@ -91,7 +91,7 @@ class NootificationsBot:
             logger.info("Bot shutdown requested")
         except Exception as e:
             logger.exception("Fatal error in bot: %s", e)
-            await self.notifier.send_alert(f"Bot crashed: {e}")
+            await self.notifier.send(f"❌ Bot crashed: {e}")
             raise
         finally:
             await self._shutdown()
@@ -181,7 +181,7 @@ class NootificationsBot:
             alert.new_price,
         )
 
-        await self.notifier.send_message(message)
+        await self.notifier.send(message, silent=True)
 
     async def _shutdown(self) -> None:
         """Gracefully shutdown all clients."""

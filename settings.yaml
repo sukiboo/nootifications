@@ -4,7 +4,7 @@ monitoring:
   - name: ETH  # any str, just for logs and notifications
     type: crypto  # crypto or stock, for now only crypto
     ticker: ETH/USD  # Kraken WS v2 format
-    delta: 0.0001  # if <1: percentage (0.01 = 1%), if >=1: absolute dollar amount
+    delta: 0.02  # if <1: percentage (0.01 = 1%), if >=1: absolute dollar amount
 
   - name: BTC
     type: crypto
