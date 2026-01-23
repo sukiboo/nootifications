@@ -1,25 +1,13 @@
 import asyncio
 import logging
-from dataclasses import dataclass
 
 from src.clients import KrakenClient
 from src.clients.base import BasePriceClient
-from src.schemas import AssetType, MonitorConfig, PriceUpdate
+from src.schemas import AlertInfo, AssetType, MonitorConfig, PriceUpdate
 from src.telegram import TelegramNotifier
 from src.utils import PriceStateManager, Settings
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class AlertInfo:
-    """Information about a triggered price alert."""
-
-    monitor: MonitorConfig
-    old_price: float
-    new_price: float
-    change_pct: float
-    direction: str  # "up" or "down"
 
 
 class NootificationsBot:
@@ -133,54 +121,38 @@ class NootificationsBot:
     def _check_threshold(
         self, monitor: MonitorConfig, old_price: float, new_price: float
     ) -> AlertInfo | None:
-        """Check if price change crosses the configured threshold."""
-        if old_price == 0:
-            return None
+        change_pct = (new_price - old_price) / (old_price + 1e-9)
 
-        change_pct = (new_price - old_price) / old_price
-        abs_change = abs(new_price - old_price)
-        abs_change_pct = abs(change_pct)
-
-        # Determine if threshold is crossed
-        threshold_crossed = False
         if monitor.is_percentage:
-            # Delta is a percentage (e.g., 0.05 = 5%)
-            threshold_crossed = abs_change_pct >= monitor.delta
+            threshold_crossed = abs(change_pct) > monitor.delta
         else:
-            # Delta is absolute dollar amount
-            threshold_crossed = abs_change >= monitor.delta
+            threshold_crossed = abs(new_price - old_price) > monitor.delta
 
         if not threshold_crossed:
             return None
 
-        direction = "up" if new_price > old_price else "down"
         return AlertInfo(
             monitor=monitor,
             old_price=old_price,
             new_price=new_price,
             change_pct=change_pct,
-            direction=direction,
         )
 
     async def _send_alert(self, alert: AlertInfo) -> None:
-        """Send a price alert notification."""
-        direction_emoji = "📈" if alert.direction == "up" else "📉"
-        pct_str = f"{abs(alert.change_pct) * 100:.2f}%"
-
+        direction = "up" if alert.change_pct > 0 else "down"
+        emoji = "📈" if alert.change_pct > 0 else "📉"
         message = (
-            f"{direction_emoji} {alert.monitor.name} {alert.direction} {pct_str}\n"
-            f"${alert.old_price:,.2f} → ${alert.new_price:,.2f}"
+            f"{emoji} {alert.monitor.name} {direction} "
+            f"{abs(alert.change_pct):.2%} to ${alert.new_price:,.2f}"
         )
-
         logger.info(
-            "Alert: %s %s %.2f%% ($%.2f -> $%.2f)",
+            "Alert: %s %s %.2f%% (%.2f -> %.2f)",
             alert.monitor.name,
-            alert.direction,
+            direction,
             abs(alert.change_pct) * 100,
             alert.old_price,
             alert.new_price,
         )
-
         await self.notifier.send(message, silent=True)
 
     async def _shutdown(self) -> None:

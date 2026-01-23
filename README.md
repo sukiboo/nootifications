@@ -20,12 +20,12 @@ monitoring:
   - name: ETH
     type: crypto
     ticker: ETH/USD  # Kraken WS v2 format
-    delta: 0.02      # 2% change triggers alert
+    delta: 0.01      # 1% change triggers alert
 
   - name: BTC
     type: crypto
     ticker: BTC/USD
-    delta: 2000      # $2000 change triggers alert
+    delta: 1000      # $1000 change triggers alert
 ```
 
 Delta interpretation:
