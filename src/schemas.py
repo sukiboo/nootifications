@@ -36,6 +36,9 @@ class KrakenConfig(BaseModel):
     throttle_seconds: float = Field(
         default=1.0, description="Min seconds between price updates per ticker"
     )
+    smoothing: float = Field(
+        default=0.0, ge=0, lt=1, description="Price smoothing factor (0=disabled, 0.9=heavy)"
+    )
     reconnect_delay: int = Field(default=5, description="Seconds between reconnection attempts")
     max_reconnect_attempts: int = Field(
         default=10, description="Max reconnection attempts before giving up"

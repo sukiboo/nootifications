@@ -3,6 +3,7 @@ bot_name: nootifications-bot
 clients:
   kraken:
     throttle_seconds: 10.0
+    smoothing: 0.9
     reconnect_delay: 5
     max_reconnect_attempts: 10
 

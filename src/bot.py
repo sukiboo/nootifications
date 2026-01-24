@@ -27,6 +27,7 @@ class NootificationsBot:
         self.price_state = PriceStateManager()
         self._clients: list[BasePriceClient] = []
         self._running = False
+        self._smoothed_prices: dict[str, float] = {}
 
         # Build ticker -> monitor config mapping
         self._monitors: dict[str, MonitorConfig] = {m.ticker: m for m in settings.app.assets}
@@ -94,20 +95,27 @@ class NootificationsBot:
                 f"Configured tickers: {list(self._monitors.keys())}"
             )
 
-        old_price = self.price_state.get_price(update.ticker)
+        # Apply EMA smoothing: price = s * prev + (1-s) * raw
+        s = self._get_smoothing(update.source)
+        prev = self._smoothed_prices.get(update.ticker, update.price)
+        price = s * prev + (1 - s) * update.price
+        self._smoothed_prices[update.ticker] = price
 
-        # First price for this ticker - just record it
-        if old_price is None:
-            logger.info("Initial price for %s: $%.2f", monitor.name, update.price)
-            self.price_state.set_price(update.ticker, update.price)
+        reference = self.price_state.get_price(update.ticker)
+        if reference is None:
+            logger.info("Initial price for %s: $%.2f", monitor.name, price)
+            self.price_state.set_price(update.ticker, price)
             return
 
-        # Check if threshold is crossed
-        alert = self._check_threshold(monitor, old_price, update.price)
-        if alert:
+        if alert := self._check_threshold(monitor, reference, price):
             await self._send_alert(alert)
-            # Update reference price after alert
-            self.price_state.set_price(update.ticker, update.price)
+            self.price_state.set_price(update.ticker, price)
+
+    def _get_smoothing(self, source: str) -> float:
+        if source == "kraken":
+            return self.settings.app.clients.kraken.smoothing
+        else:
+            return 0.0
 
     def _check_threshold(
         self, monitor: MonitorConfig, old_price: float, new_price: float
@@ -136,7 +144,7 @@ class NootificationsBot:
         direction = "up" if alert.change_pct > 0 else "down"
         emoji = "📈" if alert.change_pct > 0 else "📉"
         message = (
-            f"{emoji} {alert.monitor.name} {direction} "
+            f"{emoji} {alert.monitor.name} is {direction} "
             f"{abs(alert.change_pct):.2%} to ${alert.new_price:,.2f}"
         )
         logger.info(

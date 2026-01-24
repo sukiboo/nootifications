@@ -11,7 +11,7 @@ Price monitoring bot that sends Telegram alerts when assets move beyond a config
 
 ## Configuration
 
-**`settings.yaml`** — Define assets to monitor:
+**`settings.yaml`** -- Define assets to monitor:
 
 ```yaml
 bot_name: nootifications-bot
@@ -19,6 +19,7 @@ bot_name: nootifications-bot
 clients:
   kraken:
     throttle_seconds: 10.0      # min seconds between updates per ticker
+    smoothing: 0.0              # EMA smoothing (0=off, 0.9=heavy)
     reconnect_delay: 5          # seconds between reconnection attempts
     max_reconnect_attempts: 10  # give up after N failures
 
@@ -38,7 +39,7 @@ Delta interpretation:
 - `< 1` → percentage (e.g. `0.05 = 5%`) -- alerts when price changes by `X%` from reference
 - `> 1` → interval mode -- alerts when price crosses a multiple of the delta (e.g., `1000` alerts at `$85k`, `$86k`, `$87k` boundaries)
 
-**`.env`** — Required secrets:
+**`.env`** -- Required secrets:
 
 ```
 TELEGRAM_BOT_TOKEN=YOUR_BOT_TOKEN_HERE
