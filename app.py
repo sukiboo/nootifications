@@ -15,7 +15,7 @@ def main() -> int:
     try:
         settings = Settings()
         logger.info("Configuration loaded: %s", settings.bot_name)
-        logger.info("Monitoring %d assets", len(settings.app.monitoring))
+        logger.info("Monitoring %d assets", len(settings.app.assets))
 
         bot = NootificationsBot(settings)
         asyncio.run(bot.run())
