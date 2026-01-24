@@ -20,17 +20,17 @@ monitoring:
   - name: ETH
     type: crypto
     ticker: ETH/USD  # Kraken WS v2 format
-    delta: 0.01      # 1% change triggers alert
+    delta: 0.01      # alert when price changes 1%
 
   - name: BTC
     type: crypto
     ticker: BTC/USD
-    delta: 1000      # $1000 change triggers alert
+    delta: 1000      # alert when price crossing $1k intervals (85k, 86k, etc.)
 ```
 
 Delta interpretation:
-- `< 1` → percentage (e.g., `0.05` = 5%)
-- `>= 1` → absolute dollar amount
+- `< 1` → percentage (e.g., `0.05` = 5%) -- alerts when price changes by X% from reference
+- `>= 1` → interval mode -- alerts when price crosses a multiple of the delta (e.g., `1000` alerts at $85k, $86k, $87k boundaries)
 
 **`.env`** — Required secrets:
 

@@ -126,7 +126,10 @@ class NootificationsBot:
         if monitor.is_percentage:
             threshold_crossed = abs(change_pct) > monitor.delta
         else:
-            threshold_crossed = abs(new_price - old_price) > monitor.delta
+            old_interval = int(old_price // monitor.delta)
+            new_interval = int(new_price // monitor.delta)
+            threshold_crossed = old_interval != new_interval
+            new_price = new_interval * monitor.delta
 
         if not threshold_crossed:
             return None
