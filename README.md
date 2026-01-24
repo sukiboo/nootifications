@@ -1,4 +1,4 @@
-# nootifications 🔎🐙🦙
+# nootifications-bot 🔎🐙🦙
 
 Price monitoring bot that sends Telegram alerts when the asset's price moves beyond a set threshold.
 
@@ -7,8 +7,7 @@ Price monitoring bot that sends Telegram alerts when the asset's price moves bey
 - Real-time crypto price monitoring via Kraken WebSocket v2
 - US stock price monitoring via Alpaca WebSocket (IEX feed)
 - Configurable delta thresholds (percentage or absolute dollar amount)
-- Persistent price state for crash recovery
-- Extensible client architecture for future asset types (stocks, etc.)
+- Persistent price state for crash recovery (not really)
 
 ## Configuration
 
@@ -18,13 +17,16 @@ Price monitoring bot that sends Telegram alerts when the asset's price moves bey
 bot_name: nootifications-bot
 
 clients:
+  # crypto monitoring; no account is required
   kraken:
     smoothing: 0.0              # EMA smoothing (0=off, 0.9=heavy)
     throttle_seconds: 10.0      # min seconds between updates per ticker
     reconnect_delay: 5          # seconds between reconnection attempts
     max_reconnect_attempts: 10  # give up after N failures
-  alpaca:                      # US stocks; use your Alpaca account
-    feed: iex                  # iex (free) or sip
+
+  # US stocks monitoring; free Alpaca account is required
+  alpaca:
+    feed: iex                   # iex (free) or sip
     smoothing: 0.0
     throttle_seconds: 1.0
     reconnect_delay: 5
@@ -96,8 +98,8 @@ Required `.env` variables for deployment:
 SERVER_USER=YOUR_USERNAME_HERE
 SERVER_HOST=YOUR_HOSTNAME_HERE
 SERVER_PATH=YOUR_APP_PATH_HERE
-REPO_URL=git@github.com:you/nootifications.git
-IMAGE_NAME=nootifications
+REPO_URL=git@github.com:sukiboo/nootifications-bot.git
+IMAGE_NAME=nootifications-bot
 ```
 
 Run:
