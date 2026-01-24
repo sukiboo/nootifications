@@ -1,12 +1,18 @@
 bot_name: nootifications-bot
 
-monitoring:
-  - name: ETH  # any str, just for logs and notifications
-    type: crypto  # crypto or stock, for now only crypto
-    ticker: ETH/USD  # Kraken WS v2 format
-    delta: 0.01  # if <1: percentage (0.01 = 1%), if >=1: absolute dollar amount
+clients:
+  kraken:
+    throttle_seconds: 10.0
+    reconnect_delay: 5
+    max_reconnect_attempts: 10
+
+assets:
+  - name: ETH
+    client: kraken
+    ticker: ETH/USD
+    delta: 0.01
 
   - name: BTC
-    type: crypto
+    client: kraken
     ticker: BTC/USD
     delta: 1000

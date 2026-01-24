@@ -16,21 +16,27 @@ Price monitoring bot that sends Telegram alerts when assets move beyond a config
 ```yaml
 bot_name: nootifications-bot
 
-monitoring:
-  - name: ETH
-    type: crypto
-    ticker: ETH/USD  # Kraken WS v2 format
-    delta: 0.01      # alert when price changes 1%
+clients:
+  kraken:
+    throttle_seconds: 10.0      # min seconds between updates per ticker
+    reconnect_delay: 5          # seconds between reconnection attempts
+    max_reconnect_attempts: 10  # give up after N failures
+
+assets:
+  - name: ETH         # display name for notifications
+    client: kraken    # which client to use for price data
+    ticker: ETH/USD   # ticker symbol in client's format
+    delta: 0.01       # alert when price changes 1%
 
   - name: BTC
-    type: crypto
+    client: kraken
     ticker: BTC/USD
-    delta: 1000      # alert when price crossing $1k intervals (85k, 86k, etc.)
+    delta: 1000       # alert when price crosses $1k intervals (85k, 86k, etc.)
 ```
 
 Delta interpretation:
-- `< 1` → percentage (e.g., `0.05` = 5%) -- alerts when price changes by X% from reference
-- `>= 1` → interval mode -- alerts when price crosses a multiple of the delta (e.g., `1000` alerts at $85k, $86k, $87k boundaries)
+- `< 1` → percentage (e.g. `0.05 = 5%`) -- alerts when price changes by `X%` from reference
+- `> 1` → interval mode -- alerts when price crosses a multiple of the delta (e.g., `1000` alerts at `$85k`, `$86k`, `$87k` boundaries)
 
 **`.env`** — Required secrets:
 

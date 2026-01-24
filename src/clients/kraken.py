@@ -1,12 +1,13 @@
 import asyncio
 import logging
+import time
 from collections.abc import AsyncIterator
 from typing import Any
 
 from kraken.spot import SpotWSClient
 
 from src.clients.base import BasePriceClient
-from src.schemas import PriceUpdate
+from src.schemas import KrakenConfig, PriceUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -18,10 +19,8 @@ class KrakenClient(BasePriceClient):
     Uses WebSocket API v2 for real-time ticker data.
     """
 
-    RECONNECT_DELAY = 5  # seconds between reconnection attempts
-    MAX_RECONNECT_ATTEMPTS = 10
-
-    def __init__(self) -> None:
+    def __init__(self, config: KrakenConfig | None = None) -> None:
+        self._config = config or KrakenConfig()
         self._client: _KrakenWSHandler | None = None
         self._connected = False
         self._subscribed_tickers: list[str] = []
@@ -41,7 +40,7 @@ class KrakenClient(BasePriceClient):
             return
 
         logger.info("Connecting to Kraken WebSocket...")
-        self._client = _KrakenWSHandler(self._price_queue)
+        self._client = _KrakenWSHandler(self._price_queue, self._config.throttle_seconds)
         await self._client.start()
         self._connected = True
         logger.info("Connected to Kraken WebSocket")
@@ -101,7 +100,7 @@ class KrakenClient(BasePriceClient):
                 logger.error("Error in price update stream: %s", e)
                 self._connected = False
 
-                if reconnect_attempts >= self.MAX_RECONNECT_ATTEMPTS:
+                if reconnect_attempts >= self._config.max_reconnect_attempts:
                     logger.error("Max reconnection attempts reached, giving up")
                     raise
 
@@ -109,11 +108,11 @@ class KrakenClient(BasePriceClient):
                 logger.info(
                     "Attempting reconnection %d/%d in %ds...",
                     reconnect_attempts,
-                    self.MAX_RECONNECT_ATTEMPTS,
-                    self.RECONNECT_DELAY,
+                    self._config.max_reconnect_attempts,
+                    self._config.reconnect_delay,
                 )
 
-                await asyncio.sleep(self.RECONNECT_DELAY)
+                await asyncio.sleep(self._config.reconnect_delay)
 
                 try:
                     await self.disconnect()
@@ -131,9 +130,11 @@ class _KrakenWSHandler(SpotWSClient):
     Processes incoming messages and puts price updates on the queue.
     """
 
-    def __init__(self, price_queue: asyncio.Queue[PriceUpdate]) -> None:
+    def __init__(self, price_queue: asyncio.Queue[PriceUpdate], throttle_seconds: float) -> None:
         super().__init__()
         self._price_queue = price_queue
+        self._throttle_seconds = throttle_seconds
+        self._last_update: dict[str, float] = {}
 
     async def on_message(self, message: dict[str, Any]) -> None:
         """Process incoming WebSocket messages."""
@@ -160,6 +161,10 @@ class _KrakenWSHandler(SpotWSClient):
                 last_price = ticker_data.get("last")
 
                 if symbol and last_price is not None:
+                    now = time.monotonic()
+                    if now - self._last_update.get(symbol, 0) < self._throttle_seconds:
+                        continue
+                    self._last_update[symbol] = now
                     price = float(last_price)
                     update = PriceUpdate(ticker=symbol, price=price, source="kraken")
                     await self._price_queue.put(update)

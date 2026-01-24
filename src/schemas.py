@@ -6,13 +6,6 @@ from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
 
 
-class AppConfig(BaseModel):
-    """Top-level application config loaded from settings.yaml."""
-
-    bot_name: str = Field(default="nootifications-bot")
-    monitoring: list[MonitorConfig] = Field(default_factory=list)
-
-
 class EnvSettings(BaseSettings):
     """Environment variables loaded from .env file."""
 
@@ -23,19 +16,44 @@ class EnvSettings(BaseSettings):
     kraken_api_secret: str | None = Field(default=None, description="Kraken API secret")
 
 
-class AssetType(str, Enum):
-    """Supported asset types for price monitoring."""
+class AppConfig(BaseModel):
+    """Top-level application config loaded from settings.yaml."""
 
-    CRYPTO = "crypto"
-    STOCK = "stock"  # Future support
+    bot_name: str = Field(default="nootifications-bot")
+    clients: ClientsConfig = Field(default_factory=lambda: ClientsConfig())
+    assets: list[MonitorConfig] = Field(default_factory=list)
+
+
+class ClientsConfig(BaseModel):
+    """Configuration for price data clients."""
+
+    kraken: KrakenConfig = Field(default_factory=lambda: KrakenConfig())
+
+
+class KrakenConfig(BaseModel):
+    """Configuration for Kraken WebSocket client."""
+
+    throttle_seconds: float = Field(
+        default=1.0, description="Min seconds between price updates per ticker"
+    )
+    reconnect_delay: int = Field(default=5, description="Seconds between reconnection attempts")
+    max_reconnect_attempts: int = Field(
+        default=10, description="Max reconnection attempts before giving up"
+    )
+
+
+class Client(str, Enum):
+    """Supported price data clients."""
+
+    KRAKEN = "kraken"
 
 
 class MonitorConfig(BaseModel):
     """Configuration for a single asset to monitor (from settings.yaml)."""
 
     name: str = Field(..., description="Display name for notifications")
-    type: AssetType = Field(..., description="Asset type (crypto, stock)")
-    ticker: str = Field(..., description="Exchange ticker symbol")
+    client: Client = Field(..., description="Client to use for price data")
+    ticker: str = Field(..., description="Ticker symbol in client's format")
     delta: float = Field(
         ...,
         gt=0,
