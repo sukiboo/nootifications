@@ -2,8 +2,14 @@ bot_name: nootifications-bot
 
 clients:
   kraken:
-    throttle_seconds: 10.0
     smoothing: 0.9
+    throttle_seconds: 10.0
+    reconnect_delay: 5
+    max_reconnect_attempts: 10
+  alpaca:
+    feed: iex
+    smoothing: 0.9
+    throttle_seconds: 10.0
     reconnect_delay: 5
     max_reconnect_attempts: 10
 
@@ -17,3 +23,8 @@ assets:
     client: kraken
     ticker: BTC/USD
     delta: 1000
+
+  - name: Apple
+    client: alpaca
+    ticker: AAPL
+    delta: 0.001

@@ -14,6 +14,8 @@ class EnvSettings(BaseSettings):
     telegram_user_id: str = Field(..., description="Telegram user/chat ID for notifications")
     kraken_api_key: str | None = Field(default=None, description="Kraken API key")
     kraken_api_secret: str | None = Field(default=None, description="Kraken API secret")
+    alpaca_api_key: str | None = Field(default=None, description="Alpaca API key")
+    alpaca_api_secret: str | None = Field(default=None, description="Alpaca API secret")
 
 
 class AppConfig(BaseModel):
@@ -28,6 +30,7 @@ class ClientsConfig(BaseModel):
     """Configuration for price data clients."""
 
     kraken: KrakenConfig = Field(default_factory=lambda: KrakenConfig())
+    alpaca: AlpacaConfig = Field(default_factory=lambda: AlpacaConfig())
 
 
 class KrakenConfig(BaseModel):
@@ -45,10 +48,30 @@ class KrakenConfig(BaseModel):
     )
 
 
+class AlpacaConfig(BaseModel):
+    """Configuration for Alpaca WebSocket client (US stocks)."""
+
+    feed: str = Field(
+        default="iex",
+        description="Market data feed: 'iex' (free) or 'sip'",
+    )
+    throttle_seconds: float = Field(
+        default=1.0, description="Min seconds between price updates per ticker"
+    )
+    smoothing: float = Field(
+        default=0.0, ge=0, lt=1, description="Price smoothing factor (0=disabled, 0.9=heavy)"
+    )
+    reconnect_delay: int = Field(default=5, description="Seconds between reconnection attempts")
+    max_reconnect_attempts: int = Field(
+        default=10, description="Max reconnection attempts before giving up"
+    )
+
+
 class Client(str, Enum):
     """Supported price data clients."""
 
     KRAKEN = "kraken"
+    ALPACA = "alpaca"
 
 
 class MonitorConfig(BaseModel):

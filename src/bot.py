@@ -1,8 +1,9 @@
 import asyncio
 import logging
 
-from src.clients import KrakenClient
+from src.clients.alpaca import AlpacaClient
 from src.clients.base import BasePriceClient
+from src.clients.kraken import KrakenClient
 from src.schemas import AlertInfo, Client, MonitorConfig, PriceUpdate
 from src.telegram import TelegramNotifier
 from src.utils import PriceStateManager, Settings
@@ -33,16 +34,31 @@ class NootificationsBot:
         self._monitors: dict[str, MonitorConfig] = {m.ticker: m for m in settings.app.assets}
 
     async def run(self) -> None:
-        """Main entry point - start monitoring and run until cancelled."""
+        """Main entry point -- start monitoring and run until cancelled."""
         self._running = True
         logger.info("Starting %s", self.settings.bot_name)
 
         # Initialize clients based on configured assets
         kraken_tickers = [m.ticker for m in self.settings.app.assets if m.client == Client.KRAKEN]
+        alpaca_tickers = [m.ticker for m in self.settings.app.assets if m.client == Client.ALPACA]
 
         if kraken_tickers:
             kraken_client = KrakenClient(self.settings.app.clients.kraken)
             self._clients.append(kraken_client)
+        if alpaca_tickers:
+            key = self.settings.env.alpaca_api_key
+            secret = self.settings.env.alpaca_api_secret
+            if not key or not secret:
+                raise RuntimeError(
+                    "Alpaca assets configured but ALPACA_API_KEY / ALPACA_API_SECRET not set. "
+                    "Add them to .env (from your Alpaca account)."
+                )
+            alpaca_client = AlpacaClient(
+                self.settings.app.clients.alpaca,
+                api_key=key,
+                api_secret=secret,
+            )
+            self._clients.append(alpaca_client)
 
         if not self._clients:
             logger.error("No valid monitors configured, nothing to do")
@@ -62,6 +78,9 @@ class NootificationsBot:
                 # Subscribe to relevant tickers
                 if isinstance(client, KrakenClient):
                     await client.subscribe(kraken_tickers)
+                    tasks.append(asyncio.create_task(self._monitor_client(client)))
+                elif isinstance(client, AlpacaClient):
+                    await client.subscribe(alpaca_tickers)
                     tasks.append(asyncio.create_task(self._monitor_client(client)))
 
             # Wait for all monitoring tasks
@@ -114,8 +133,9 @@ class NootificationsBot:
     def _get_smoothing(self, source: str) -> float:
         if source == "kraken":
             return self.settings.app.clients.kraken.smoothing
-        else:
-            return 0.0
+        if source == "alpaca":
+            return self.settings.app.clients.alpaca.smoothing
+        return 0.0
 
     def _check_threshold(
         self, monitor: MonitorConfig, old_price: float, new_price: float
