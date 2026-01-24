@@ -84,10 +84,18 @@ class AlpacaClient(BasePriceClient):
             await self._ws.close()
             self._ws = None
             raise RuntimeError(f"Alpaca auth failed: {auth_data.get('msg', auth_data)}")
-        if auth_data.get("T") != "success" or auth_data.get("msg") != "authenticated":
+        if auth_data.get("T") != "success":
             await self._ws.close()
             self._ws = None
             raise RuntimeError(f"Alpaca auth failed: unexpected response {auth_data}")
+        # Accept both "authenticated" and "connected" as valid success messages
+        msg = auth_data.get("msg", "")
+        if msg not in ("authenticated", "connected"):
+            await self._ws.close()
+            self._ws = None
+            raise RuntimeError(
+                f"Alpaca auth failed: unexpected message '{msg}' in response {auth_data}"
+            )
 
         self._connected = True
         self._recv_task = asyncio.create_task(self._receive_loop())
@@ -135,35 +143,42 @@ class AlpacaClient(BasePriceClient):
         try:
             async for raw in self._ws:
                 try:
-                    msg = json.loads(raw)
+                    parsed = json.loads(raw)
                 except json.JSONDecodeError as e:
                     logger.warning("Invalid JSON from Alpaca: %s", e)
                     continue
 
-                # T: message type. "t" = trade, "success"/"error" = control
-                msg_type = msg.get("T")
-                if msg_type in ("success", "error", "subscription"):
-                    continue
-                if msg_type != "t":
-                    continue
+                # Alpaca can return a single message (dict) or an array of messages (list)
+                messages = parsed if isinstance(parsed, list) else [parsed]
 
-                # Alpaca trade: S=symbol, p=price
-                symbol = msg.get("S")
-                price_raw = msg.get("p")
-                if symbol is None or price_raw is None:
-                    continue
-                try:
-                    price = float(price_raw)
-                except (TypeError, ValueError):
-                    continue
+                for msg in messages:
+                    if not isinstance(msg, dict):
+                        continue
 
-                now = time.monotonic()
-                if now - last_update.get(symbol, 0) < self._config.throttle_seconds:
-                    continue
-                last_update[symbol] = now
-                update = PriceUpdate(ticker=symbol, price=price, source="alpaca")
-                await self._price_queue.put(update)
-                logger.debug("Price update: %s = %.2f", symbol, price)
+                    # T: message type. "t" = trade, "success"/"error" = control
+                    msg_type = msg.get("T")
+                    if msg_type in ("success", "error", "subscription"):
+                        continue
+                    if msg_type != "t":
+                        continue
+
+                    # Alpaca trade: S=symbol, p=price
+                    symbol = msg.get("S")
+                    price_raw = msg.get("p")
+                    if symbol is None or price_raw is None:
+                        continue
+                    try:
+                        price = float(price_raw)
+                    except (TypeError, ValueError):
+                        continue
+
+                    now = time.monotonic()
+                    if now - last_update.get(symbol, 0) < self._config.throttle_seconds:
+                        continue
+                    last_update[symbol] = now
+                    update = PriceUpdate(ticker=symbol, price=price, source="alpaca")
+                    await self._price_queue.put(update)
+                    logger.debug("Price update: %s = %.2f", symbol, price)
 
         except asyncio.CancelledError:
             raise
