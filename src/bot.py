@@ -148,20 +148,20 @@ class NootificationsBot:
             old_interval = round(old_price / monitor.delta)
             new_interval = round(new_price / monitor.delta)
             threshold_crossed = (
-                abs(new_interval - new_price / monitor.delta) < 0.01
-                and (old_interval != new_interval)
+                new_price / monitor.delta > new_interval > old_interval
+                or new_price / monitor.delta < new_interval < old_interval
             )  # fmt: skip
             new_price = new_interval * monitor.delta
 
         if not threshold_crossed:
             return None
-
-        return AlertInfo(
-            monitor=monitor,
-            old_price=old_price,
-            new_price=new_price,
-            change_pct=change_pct,
-        )
+        else:
+            return AlertInfo(
+                monitor=monitor,
+                old_price=old_price,
+                new_price=new_price,
+                change_pct=change_pct,
+            )
 
     async def _send_alert(self, alert: AlertInfo) -> None:
         direction = "up" if alert.change_pct > 0 else "down"
