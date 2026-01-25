@@ -4,8 +4,8 @@ Price monitoring bot that sends Telegram alerts when the asset's price moves bey
 
 ## Features
 
-- Real-time crypto price monitoring via Kraken WebSocket v2
-- US stock price monitoring via Alpaca WebSocket (IEX feed)
+- Real-time crypto price monitoring via [Kraken WebSocket v2](https://support.kraken.com/articles/360022326871-kraken-websocket-api-frequently-asked-questions)
+- US stock price monitoring via [Alpaca WebSocket](https://docs.alpaca.markets/docs/streaming-market-data) (IEX feed)
 - Configurable delta thresholds (percentage or absolute dollar amount)
 - Persistent price state for crash recovery (not really)
 
@@ -71,7 +71,7 @@ TELEGRAM_BOT_TOKEN=...
 TELEGRAM_USER_ID=...
 ```
 
-Kraken crypto streaming does not require API keys.
+**Kraken** crypto streaming does not require API keys.
 
 If you use **Alpaca** (US stocks), create a free API key and add it to `.env`:
 
