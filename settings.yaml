@@ -27,4 +27,4 @@ assets:
   - name: Apple
     client: alpaca
     ticker: AAPL
-    delta: 0.001
+    delta: 0.1
