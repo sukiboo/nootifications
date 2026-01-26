@@ -1,3 +1,4 @@
+import html
 import logging
 
 from telegram import Bot
@@ -20,9 +21,9 @@ class TelegramNotifier:
         try:
             await self.bot.send_message(
                 chat_id=self.user_id,
-                text=f"`{message}`",
+                text=f"<pre>{html.escape(message)}</pre>",
+                parse_mode="HTML",
                 disable_notification=silent,
-                parse_mode="Markdown",
             )
             return True
         except TelegramError as e:
