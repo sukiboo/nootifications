@@ -24,7 +24,7 @@ assets:
     ticker: BTC/USD
     delta: 1000
 
-  - name: Apple
-    client: alpaca
-    ticker: AAPL
-    delta: 0.1
+  # - name: Apple
+  #   client: alpaca
+  #   ticker: AAPL
+  #   delta: 0.1
