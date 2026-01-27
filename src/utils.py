@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
+from ruamel.yaml import YAML
 
 from src.schemas import AppConfig, EnvSettings, PriceState
 
@@ -121,3 +122,37 @@ class PriceStateManager:
         """Update price for a ticker and persist."""
         self.state.set_price(ticker, price)
         self.save()
+
+
+class SettingsManager:
+    """Manages writing updates back to settings.yaml (e.g., marking targets as fired)."""
+
+    def __init__(self, settings_path: str | Path = "settings.yaml") -> None:
+        self.settings_path = Path(settings_path)
+        self._yaml = YAML()
+        self._yaml.preserve_quotes = True
+        self._yaml.indent(mapping=2, sequence=4, offset=2)
+
+    def mark_target_fired(self, ticker: str) -> None:
+        """Mark a target as fired by adding 'fired: true' to the asset in settings.yaml."""
+        if not self.settings_path.exists():
+            logging.warning("Settings file not found: %s", self.settings_path)
+            return
+
+        # Load with ruamel.yaml to preserve formatting and comments
+        with open(self.settings_path, encoding="utf-8") as f:
+            data = self._yaml.load(f)
+
+        # Find the asset by ticker and add fired: true
+        assets = data.get("assets", [])
+        for asset in assets:
+            if asset.get("ticker") == ticker:
+                asset["fired"] = True
+                break
+        else:
+            logging.warning("Asset with ticker %s not found in settings", ticker)
+            return
+
+        # Write back preserving formatting
+        with open(self.settings_path, "w", encoding="utf-8") as f:
+            self._yaml.dump(data, f)

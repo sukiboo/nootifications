@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from enum import Enum
+from typing import Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings
 
 
@@ -80,24 +81,22 @@ class MonitorConfig(BaseModel):
     name: str = Field(..., description="Display name for notifications")
     client: Client = Field(..., description="Client to use for price data")
     ticker: str = Field(..., description="Ticker symbol in client's format")
-    delta: float = Field(
-        ...,
-        gt=0,
-        description=(
-            "Price change threshold: either percentage (if <1)"
-            " or absolute dollar amount (if >=1)"
-        ),
+    percent: float | None = Field(
+        default=None, gt=0, lt=1, description="Percentage change threshold (e.g., 0.01 for 1%)"
     )
+    interval: float | None = Field(
+        default=None, gt=0, description="Price interval for crossing alerts (e.g., 1000 for $1000)"
+    )
+    target: float | None = Field(
+        default=None, gt=0, description="One-time price target alert (e.g., 300 for $300)"
+    )
+    fired: bool = Field(default=False, description="Whether target alert has fired (set by bot)")
 
-    @property
-    def is_percentage(self) -> bool:
-        return self.delta < 1
-
-    def format_delta(self) -> str:
-        if self.is_percentage:
-            return f"{self.delta * 100:.1f}%"
-        else:
-            return f"${self.delta:,.2f}"
+    @model_validator(mode="after")
+    def at_least_one_alert(self) -> Self:
+        if not any([self.percent, self.interval, self.target]):
+            raise ValueError("At least one alert type required: percent, interval, or target")
+        return self
 
 
 class PriceState(BaseModel):
@@ -127,3 +126,11 @@ class AlertInfo(BaseModel):
     old_price: float
     new_price: float
     change_pct: float
+
+
+class AlertType(Enum):
+    """Types of price alerts."""
+
+    PERCENT = "percent"
+    INTERVAL = "interval"
+    TARGET = "target"

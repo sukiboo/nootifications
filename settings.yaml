@@ -17,14 +17,14 @@ assets:
   - name: ETH
     client: kraken
     ticker: ETH/USD
-    delta: 0.01
+    percent: 0.01
 
   - name: BTC
     client: kraken
     ticker: BTC/USD
-    delta: 1000
+    interval: 1000
 
-  - name: SPY
+  - name: Apple
     client: alpaca
-    ticker: SPY
-    delta: 0.05
+    ticker: AAPL
+    target: 300

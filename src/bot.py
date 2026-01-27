@@ -4,8 +4,8 @@ import logging
 from src.clients.alpaca import AlpacaClient
 from src.clients.base import BasePriceClient
 from src.clients.kraken import KrakenClient
-from src.schemas import AlertInfo, Client, MonitorConfig, PriceUpdate
-from src.telegram import TelegramNotifier
+from src.notifications import AlertHandler
+from src.schemas import Client, MonitorConfig, PriceUpdate
 from src.utils import PriceStateManager, Settings
 
 logger = logging.getLogger(__name__)
@@ -19,19 +19,22 @@ class NootificationsBot:
     Telegram alerts when price thresholds are crossed.
     """
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, config_path: str = "settings.yaml") -> None:
+        self._running = False
         self.settings = settings
-        self.notifier = TelegramNotifier(
-            bot_token=settings.env.telegram_bot_token,
-            user_id=settings.env.telegram_user_id,
-        )
         self.price_state = PriceStateManager()
         self._clients: list[BasePriceClient] = []
-        self._running = False
         self._smoothed_prices: dict[str, float] = {}
 
         # Build ticker -> monitor config mapping
         self._monitors: dict[str, MonitorConfig] = {m.ticker: m for m in settings.app.assets}
+
+        # Set up alerts
+        self.alerts = AlertHandler.create(
+            bot_token=settings.env.telegram_bot_token,
+            user_id=settings.env.telegram_user_id,
+            config_path=config_path,
+        )
 
     async def run(self) -> None:
         """Main entry point -- start monitoring and run until cancelled."""
@@ -66,9 +69,7 @@ class NootificationsBot:
 
         try:
             # Send startup notification
-            await self.notifier.send(
-                f"🔆 {self.settings.bot_name}: monitoring {len(self._monitors)} assets"
-            )
+            await self.alerts.notify_startup(self.settings.bot_name, len(self._monitors))
 
             # Start all clients
             tasks = []
@@ -90,7 +91,7 @@ class NootificationsBot:
             logger.info("Bot shutdown requested")
         except Exception as e:
             logger.exception("Fatal error in bot: %s", e)
-            await self.notifier.send(f"❌ Bot crashed: {e}")
+            await self.alerts.notify_error(e)
             raise
         finally:
             await self._shutdown()
@@ -106,7 +107,6 @@ class NootificationsBot:
 
     async def _process_price_update(self, update: PriceUpdate) -> None:
         """Process a price update and check for alert conditions."""
-        # Find the monitor config for this ticker
         monitor = self._monitors.get(update.ticker)
         if not monitor:
             raise ValueError(
@@ -120,65 +120,24 @@ class NootificationsBot:
         price = s * prev + (1 - s) * update.price
         self._smoothed_prices[update.ticker] = price
 
+        # Get reference price (or initialize if first update)
         reference = self.price_state.get_price(update.ticker)
         if reference is None:
             logger.info("Initial price for %s: $%.2f", monitor.name, price)
             self.price_state.set_price(update.ticker, price)
             return
 
-        if alert := self._check_threshold(monitor, reference, price):
-            await self._send_alert(alert)
+        # Check alerts and update reference if any triggered
+        if await self.alerts.check_and_notify(monitor, reference, price):
             self.price_state.set_price(update.ticker, price)
 
     def _get_smoothing(self, source: str) -> float:
         if source == "kraken":
             return self.settings.app.clients.kraken.smoothing
-        if source == "alpaca":
+        elif source == "alpaca":
             return self.settings.app.clients.alpaca.smoothing
-        return 0.0
-
-    def _check_threshold(
-        self, monitor: MonitorConfig, old_price: float, new_price: float
-    ) -> AlertInfo | None:
-        change_pct = (new_price - old_price) / (old_price + 1e-9)
-
-        if monitor.is_percentage:
-            threshold_crossed = (abs(change_pct) > monitor.delta)  # fmt: skip
         else:
-            old_interval = round(old_price / monitor.delta)
-            new_interval = round(new_price / monitor.delta)
-            threshold_crossed = (
-                new_price / monitor.delta > new_interval > old_interval
-                or new_price / monitor.delta < new_interval < old_interval
-            )  # fmt: skip
-            new_price = new_interval * monitor.delta
-
-        if not threshold_crossed:
-            return None
-        else:
-            return AlertInfo(
-                monitor=monitor,
-                old_price=old_price,
-                new_price=new_price,
-                change_pct=change_pct,
-            )
-
-    async def _send_alert(self, alert: AlertInfo) -> None:
-        direction = "up" if alert.change_pct > 0 else "down"
-        emoji = "📈" if alert.change_pct > 0 else "📉"
-        message = (
-            f"{emoji} {alert.monitor.name} is {direction} "
-            f"{abs(alert.change_pct):.2%} to ${alert.new_price:,.2f}"
-        )
-        logger.info(
-            "Alert: %s %s %.2f%% (%.2f -> %.2f)",
-            alert.monitor.name,
-            direction,
-            abs(alert.change_pct) * 100,
-            alert.old_price,
-            alert.new_price,
-        )
-        await self.notifier.send(message, silent=True)
+            return 0.0
 
     async def _shutdown(self) -> None:
         """Gracefully shutdown all clients."""

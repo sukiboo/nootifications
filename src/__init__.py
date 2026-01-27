@@ -1,11 +1,14 @@
 from src.bot import NootificationsBot
-from src.telegram import TelegramNotifier
-from src.utils import PriceStateManager, Settings, setup_logger
+from src.notifications import AlertHandler
+from src.schemas import AlertType
+from src.utils import PriceStateManager, Settings, SettingsManager, setup_logger
 
 __all__ = [
     "NootificationsBot",
     "Settings",
-    "TelegramNotifier",
+    "SettingsManager",
+    "AlertHandler",
+    "AlertType",
     "PriceStateManager",
     "setup_logger",
 ]

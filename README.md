@@ -1,12 +1,12 @@
 # nootifications-bot 🔎🐙🦙
 
-Price monitoring bot that sends Telegram alerts when the asset's price moves beyond a set threshold.
+Price monitoring bot that sends Telegram alerts when asset prices move beyond set thresholds.
 
 ## Features
 
 - Real-time crypto price monitoring via [Kraken WebSocket v2](https://support.kraken.com/articles/360022326871-kraken-websocket-api-frequently-asked-questions)
 - US stock price monitoring via [Alpaca WebSocket](https://docs.alpaca.markets/docs/streaming-market-data) (IEX feed)
-- Configurable delta thresholds (percentage or absolute dollar amount)
+- Three alert types: percentage change, interval crossing, and one-time price targets
 - Persistent price state for crash recovery (not really)
 
 ## Configuration
@@ -37,24 +37,31 @@ assets:
   - name: ETH         # display name for notifications
     client: kraken    # which client to use for price data
     ticker: ETH/USD   # ticker symbol in client's format
-    delta: 0.01       # alert when price changes 1%
+    percent: 0.01     # alert when price changes 1%
 
   - name: BTC
     client: kraken
     ticker: BTC/USD
-    delta: 1000       # alert when price crosses $1k intervals (85k, 86k, etc.)
+    interval: 1000    # alert when price crosses $1k intervals (85k, 86k, etc.)
 
   # monitor US stocks (requires free ALPACA_API_KEY and ALPACA_API_SECRET in `.env`)
   - name: Apple
     client: alpaca
     ticker: AAPL
-    delta: 0.02
+    target: 250       # alert once when price reaches $250
 ```
 
-**Delta (threshold)** -- set per asset in `assets`:
+#### Alert types
 
-- **`delta < 1`** → percentage: `0.05` = alert when price moves 5% from reference.
-- **`delta >= 1`** → dollar intervals: `1000` = alert when price crosses each $1k ($85k, $86k, ...).
+Each asset must have at least one alert type. You can combine multiple types on a single asset.
+
+| Parameter  | Description | Example |
+| ---------- | ----------- | ------- |
+| `percent`  | Alert when price changes by X% from reference | `0.05` = 5% change |
+| `interval` | Alert when price crosses interval boundaries | `1000` = $85k, $86k, ... |
+| `target`   | One-time alert when price reaches target | `250` = alert at $250 |
+
+**Target alerts** fire once, then the bot adds `fired: true` to `settings.yaml`. To reset, remove that line, or set `fired: false`, or upload a new settings file.
 
 #### Supported clients
 
