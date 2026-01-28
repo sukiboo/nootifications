@@ -50,43 +50,39 @@ class AlertHandler:
 
     def _check_percent(self, ctx: PriceContext) -> AlertInfo | None:
         """Check if price change exceeds percentage threshold."""
-        if ctx.monitor.percent is None:
-            return None
-        if abs(ctx.change_pct) > ctx.monitor.percent:
+        if ctx.monitor.percent and abs(ctx.change_pct) > ctx.monitor.percent:
             return ctx.to_alert()
         return None
 
     def _check_interval(self, ctx: PriceContext) -> AlertInfo | None:
         """Check if price crossed an interval boundary."""
-        if ctx.monitor.interval is None:
+        if not ctx.monitor.interval:
             return None
-
-        old_interval = round(ctx.old_price / ctx.monitor.interval)
-        new_interval = round(ctx.new_price / ctx.monitor.interval)
-
-        crossed = (
-            ctx.new_price / ctx.monitor.interval > new_interval > old_interval
-            or ctx.new_price / ctx.monitor.interval < new_interval < old_interval
-        )
-
-        if crossed:
-            return ctx.to_alert(display_price=new_interval * ctx.monitor.interval)
-        return None
+        else:
+            old_idx = round(ctx.old_price / ctx.monitor.interval)
+            new_idx = round(ctx.new_price / ctx.monitor.interval)
+            ratio = ctx.new_price / ctx.monitor.interval
+            crossed = ((ratio > new_idx > old_idx) or (ratio < new_idx < old_idx))  # fmt: skip
+            if crossed:
+                return ctx.to_alert(display_price=new_idx * ctx.monitor.interval)
+            else:
+                return None
 
     def _check_target(self, ctx: PriceContext) -> AlertInfo | None:
         """Check if price crossed the target (one-time alert)."""
-        if ctx.monitor.target is None or ctx.monitor.fired:
+        if not ctx.monitor.target or ctx.monitor.fired:
             return None
-
-        target = ctx.monitor.target
-        crossed_up = ctx.old_price < target <= ctx.new_price
-        crossed_down = ctx.old_price > target >= ctx.new_price
-
-        if crossed_up or crossed_down:
-            self._settings_manager.mark_target_fired(ctx.monitor.ticker)
-            ctx.monitor.fired = True
-            return ctx.to_alert()
-        return None
+        else:
+            crossed = (
+                (ctx.old_price < ctx.monitor.target < ctx.new_price)
+                or (ctx.old_price > ctx.monitor.target > ctx.new_price)
+            )  # fmt: skip
+            if crossed:
+                self._settings_manager.mark_target_fired(ctx.monitor.ticker)
+                ctx.monitor.fired = True
+                return ctx.to_alert()
+            else:
+                return None
 
     async def _send(self, alert: AlertInfo, alert_type: AlertType) -> None:
         """Send an alert notification."""
@@ -116,6 +112,6 @@ class AlertHandler:
         elif alert_type == AlertType.INTERVAL:
             return f"{status} {alert.monitor.name} is {direction} to ${alert.new_price:,.2f}"
         elif alert_type == AlertType.TARGET:
-            return f"🎯 {alert.monitor.name} reached target ${alert.monitor.target:,.2f}"
+            return f"🎯 {alert.monitor.name} reached ${alert.monitor.target:,.2f}"
         else:
             return f"📊 {alert.monitor.name} price update: ${alert.new_price:,.2f}"

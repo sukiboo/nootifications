@@ -54,7 +54,7 @@ class NootificationsBot:
             if not key or not secret:
                 raise RuntimeError(
                     "Alpaca assets configured but ALPACA_API_KEY / ALPACA_API_SECRET not set. "
-                    "Add them to .env (from your Alpaca account)."
+                    "Add them to `.env` (from your Alpaca account)."
                 )
             alpaca_client = AlpacaClient(
                 self.settings.app.clients.alpaca,
