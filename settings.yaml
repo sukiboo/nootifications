@@ -24,7 +24,7 @@ assets:
     ticker: BTC/USD
     interval: 1000
 
-  - name: Apple
+  - name: QQQ
     client: alpaca
-    ticker: AAPL
-    target: 300
+    ticker: QQQ
+    target: 645

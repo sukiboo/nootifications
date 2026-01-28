@@ -119,13 +119,46 @@ class PriceUpdate(BaseModel):
     source: str = Field(default="unknown", description="Source client identifier")
 
 
-class AlertInfo(BaseModel):
-    """Data for a triggered price alert, passed to notification sender."""
+class PriceContext(BaseModel):
+    """Context for checking price alerts, computed once per price update."""
 
     monitor: MonitorConfig
     old_price: float
     new_price: float
     change_pct: float
+
+    @classmethod
+    def create(cls, monitor: MonitorConfig, old_price: float, new_price: float) -> "PriceContext":
+        """Create a PriceContext with computed change_pct."""
+        change_pct = (new_price - old_price) / (old_price + 1e-9)
+        return cls(monitor=monitor, old_price=old_price, new_price=new_price, change_pct=change_pct)
+
+    def to_alert(self, display_price: float | None = None) -> "AlertInfo":
+        """Convert to AlertInfo, optionally with a display price override (for interval alerts)."""
+        return AlertInfo(ctx=self, display_price=display_price)
+
+
+class AlertInfo(BaseModel):
+    """Data for a triggered price alert, passed to notification sender."""
+
+    ctx: PriceContext
+    display_price: float | None = None
+
+    @property
+    def monitor(self) -> MonitorConfig:
+        return self.ctx.monitor
+
+    @property
+    def old_price(self) -> float:
+        return self.ctx.old_price
+
+    @property
+    def new_price(self) -> float:
+        return self.display_price if self.display_price is not None else self.ctx.new_price
+
+    @property
+    def change_pct(self) -> float:
+        return self.ctx.change_pct
 
 
 class AlertType(Enum):
