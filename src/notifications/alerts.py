@@ -52,7 +52,8 @@ class AlertHandler:
         """Check if price change exceeds percentage threshold."""
         if ctx.monitor.percent and abs(ctx.change_pct) > ctx.monitor.percent:
             return ctx.to_alert()
-        return None
+        else:
+            return None
 
     def _check_interval(self, ctx: PriceContext) -> AlertInfo | None:
         """Check if price crossed an interval boundary."""
