@@ -13,6 +13,14 @@ Price monitoring bot that sends Telegram alerts when asset prices move beyond se
 
 #### Set assets to monitor in `settings.yaml`
 
+Copy the example files and customize them:
+```bash
+cp .env.example .env
+cp settings.example.yaml settings.yaml
+```
+
+Both files are gitignored and deployed separately, so you can update credentials and thresholds without pushing to git.
+
 ```yaml
 bot_name: nootifications-bot
 
@@ -116,5 +124,5 @@ Run:
 
 This will:
 1. Pull/clone the repo on the server
-2. Copy `.env` to the server
+2. Copy `.env` and `settings.yaml` to the server
 3. Build and run the Docker container with auto-restart
