@@ -51,6 +51,9 @@ echo "==> 🔑 Copy \`.env\` to server"
 scp "$ENV_LOCAL_PATH" "${SERVER_USER}@${SERVER_HOST}:~/${SERVER_PATH}/.env" >/dev/null 2>&1
 ssh "${SERVER_USER}@${SERVER_HOST}" "chmod 600 ~/${SERVER_PATH}/.env" >/dev/null 2>&1
 
+echo "==> ⚙️  Copy \`settings.yaml\` to server"
+scp "settings.yaml" "${SERVER_USER}@${SERVER_HOST}:~/${SERVER_PATH}/settings.yaml" >/dev/null 2>&1
+
 echo "==> 🚀 Build and run the container"
 
 ssh "${SERVER_USER}@${SERVER_HOST}" << EOF >/dev/null 2>&1
@@ -87,6 +90,7 @@ cd "\$APPDIR"
   --restart unless-stopped \\
   --env-file "\$APPDIR/.env" \\
   -v "\$APPDIR/logs:/app/logs" \\
+  -v "\$APPDIR/settings.yaml:/app/settings.yaml:ro" \\
   "${IMAGE_NAME}:latest" >/dev/null 2>&1
 EOF
 
