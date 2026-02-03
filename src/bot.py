@@ -47,6 +47,7 @@ class NootificationsBot:
 
         if kraken_tickers:
             kraken_client = KrakenClient(self.settings.app.clients.kraken)
+            kraken_client.validate_tickers(kraken_tickers)
             self._clients.append(kraken_client)
         if alpaca_tickers:
             key = self.settings.env.alpaca_api_key
@@ -61,6 +62,7 @@ class NootificationsBot:
                 api_key=key,
                 api_secret=secret,
             )
+            alpaca_client.validate_tickers(alpaca_tickers)
             self._clients.append(alpaca_client)
 
         if not self._clients:

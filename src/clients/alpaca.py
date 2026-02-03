@@ -2,6 +2,8 @@ import asyncio
 import json
 import logging
 import time
+import urllib.error
+import urllib.request
 from collections.abc import AsyncIterator
 
 import websockets
@@ -134,6 +136,37 @@ class AlpacaClient(BasePriceClient):
         await self._ws.send(json.dumps({"action": "subscribe", "trades": tickers}))
         self._subscribed_tickers = tickers
         logger.info("Subscribed to %d tickers", len(tickers))
+
+    def validate_tickers(self, tickers: list[str]) -> None:
+        """Validate tickers against Alpaca's available assets."""
+        if not tickers:
+            return
+        if not self._api_key or not self._api_secret:
+            raise RuntimeError("Alpaca API credentials required for ticker validation")
+
+        invalid = []
+        for ticker in tickers:
+            url = f"https://api.alpaca.markets/v2/assets/{ticker}"
+            req = urllib.request.Request(
+                url,
+                headers={
+                    "APCA-API-KEY-ID": self._api_key,
+                    "APCA-API-SECRET-KEY": self._api_secret,
+                },
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=10) as resp:  # nosec B310
+                    data = json.loads(resp.read().decode())
+                    if not data.get("tradable", False):
+                        invalid.append(f"{ticker} (not tradable)")
+            except urllib.error.HTTPError as e:
+                if e.code == 404:
+                    invalid.append(ticker)
+                else:
+                    raise ValueError(f"Alpaca API error for {ticker}: {e.code} {e.reason}")
+
+        if invalid:
+            raise ValueError(f"Invalid Alpaca ticker(s): {invalid}")
 
     async def _receive_loop(self) -> None:
         """Process incoming WebSocket messages and queue price updates."""

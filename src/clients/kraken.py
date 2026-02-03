@@ -4,7 +4,7 @@ import time
 from collections.abc import AsyncIterator
 from typing import Any
 
-from kraken.spot import SpotWSClient
+from kraken.spot import Market, SpotWSClient
 
 from src.clients.base import BasePriceClient
 from src.schemas import KrakenConfig, PriceUpdate
@@ -71,6 +71,23 @@ class KrakenClient(BasePriceClient):
         await self._client.subscribe(params={"channel": "ticker", "symbol": tickers})
         self._subscribed_tickers = tickers
         logger.info("Subscribed to %d tickers", len(tickers))
+
+    def validate_tickers(self, tickers: list[str]) -> None:
+        """Validate tickers against Kraken's available trading pairs."""
+        if not tickers:
+            return
+
+        market = Market()
+        pairs_response = market.get_asset_pairs()
+        # Build set of valid symbols in WS v2 format (e.g., "BTC/USD")
+        valid_symbols: set[str] = set()
+        for pair_info in pairs_response.values():
+            if isinstance(pair_info, dict) and "wsname" in pair_info:
+                valid_symbols.add(pair_info["wsname"])
+
+        invalid = [t for t in tickers if t not in valid_symbols]
+        if invalid:
+            raise ValueError(f"Invalid Kraken ticker(s): {invalid}. Use WS format like 'BTC/USD'")
 
     async def price_updates(self) -> AsyncIterator[PriceUpdate]:
         """

@@ -66,3 +66,16 @@ class BasePriceClient(ABC):
         Should handle reconnection internally where appropriate.
         """
         ...
+
+    @abstractmethod
+    def validate_tickers(self, tickers: list[str]) -> None:
+        """
+        Validate that all tickers are supported by this client.
+
+        Args:
+            tickers: List of ticker symbols to validate
+
+        Raises:
+            ValueError: If any ticker is invalid or unsupported
+        """
+        ...
