@@ -144,26 +144,49 @@ class AlpacaClient(BasePriceClient):
         if not self._api_key or not self._api_secret:
             raise RuntimeError("Alpaca API credentials required for ticker validation")
 
+        # Try live API first, fall back to paper API (keys are endpoint-specific)
+        base_urls = [
+            "https://api.alpaca.markets",
+            "https://paper-api.alpaca.markets",
+        ]
+
         invalid = []
         for ticker in tickers:
-            url = f"https://api.alpaca.markets/v2/assets/{ticker}"
-            req = urllib.request.Request(
-                url,
-                headers={
-                    "APCA-API-KEY-ID": self._api_key,
-                    "APCA-API-SECRET-KEY": self._api_secret,
-                },
-            )
-            try:
-                with urllib.request.urlopen(req, timeout=10) as resp:  # nosec B310
-                    data = json.loads(resp.read().decode())
-                    if not data.get("tradable", False):
-                        invalid.append(f"{ticker} (not tradable)")
-            except urllib.error.HTTPError as e:
-                if e.code == 404:
-                    invalid.append(ticker)
-                else:
-                    raise ValueError(f"Alpaca API error for {ticker}: {e.code} {e.reason}")
+            validated = False
+            last_error = None
+
+            for base_url in base_urls:
+                url = f"{base_url}/v2/assets/{ticker}"
+                req = urllib.request.Request(
+                    url,
+                    headers={
+                        "APCA-API-KEY-ID": self._api_key,
+                        "APCA-API-SECRET-KEY": self._api_secret,
+                    },
+                )
+                try:
+                    with urllib.request.urlopen(
+                        req, timeout=10
+                    ) as resp:  # nosec B310 - URL is hardcoded https
+                        data = json.loads(resp.read().decode())
+                        if not data.get("tradable", False):
+                            invalid.append(f"{ticker} (not tradable)")
+                        validated = True
+                        break
+                except urllib.error.HTTPError as e:
+                    if e.code == 404:
+                        invalid.append(ticker)
+                        validated = True
+                        break
+                    elif e.code == 401:
+                        # Wrong endpoint for this key type, try next
+                        last_error = e
+                        continue
+                    else:
+                        raise ValueError(f"Alpaca API error for {ticker}: {e.code} {e.reason}")
+
+            if not validated and last_error:
+                raise ValueError(f"Alpaca API authentication failed. Check your API keys in .env")
 
         if invalid:
             raise ValueError(f"Invalid Alpaca ticker(s): {invalid}")
