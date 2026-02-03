@@ -77,17 +77,31 @@ class KrakenClient(BasePriceClient):
         if not tickers:
             return
 
+        # Check for deprecated XBT format first
+        deprecated = [t for t in tickers if "XBT" in t]
+        if deprecated:
+            raise ValueError(
+                f"Deprecated ticker format: {deprecated}. "
+                "Use 'BTC' instead of 'XBT' (e.g. 'BTC/USD')."
+            )
+
         market = Market()
         pairs_response = market.get_asset_pairs()
+
         # Build set of valid symbols in WS v2 format (e.g., "BTC/USD")
+        # REST API returns wsname in v1 format (XBT), convert to v2 format (BTC)
         valid_symbols: set[str] = set()
         for pair_info in pairs_response.values():
             if isinstance(pair_info, dict) and "wsname" in pair_info:
-                valid_symbols.add(pair_info["wsname"])
+                wsname = pair_info["wsname"]
+                # Convert v1 format (XBT) to v2 format (BTC)
+                valid_symbols.add(wsname.replace("XBT", "BTC"))
 
         invalid = [t for t in tickers if t not in valid_symbols]
         if invalid:
-            raise ValueError(f"Invalid Kraken ticker(s): {invalid}. Use WS format like 'BTC/USD'")
+            raise ValueError(
+                f"Invalid Kraken ticker(s): {invalid}. " "Use format like 'BTC/USD', 'ETH/USD'."
+            )
 
     async def price_updates(self) -> AsyncIterator[PriceUpdate]:
         """

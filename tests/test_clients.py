@@ -15,11 +15,11 @@ class TestKrakenTickerValidation:
 
     @pytest.fixture
     def mock_asset_pairs(self) -> dict:
-        """Sample Kraken asset pairs response."""
+        """Sample Kraken asset pairs response (REST API format with v1 wsname)."""
         return {
             "XXBTZUSD": {
                 "altname": "XBTUSD",
-                "wsname": "XBT/USD",
+                "wsname": "XBT/USD",  # v1 format, v2 uses BTC/USD
                 "base": "XXBT",
                 "quote": "ZUSD",
             },
@@ -38,7 +38,7 @@ class TestKrakenTickerValidation:
         }
 
     def test_valid_tickers_pass(self, mock_asset_pairs: dict) -> None:
-        """Valid tickers should not raise."""
+        """WS v2 format tickers (BTC/USD) should pass."""
         client = KrakenClient(KrakenConfig())
 
         with patch("src.clients.kraken.Market") as mock_market_cls:
@@ -46,8 +46,15 @@ class TestKrakenTickerValidation:
             mock_market.get_asset_pairs.return_value = mock_asset_pairs
             mock_market_cls.return_value = mock_market
 
-            # Should not raise
-            client.validate_tickers(["XBT/USD", "ETH/USD"])
+            # BTC/USD is the v2 format, should work
+            client.validate_tickers(["BTC/USD", "ETH/USD"])
+
+    def test_deprecated_xbt_format_raises(self, mock_asset_pairs: dict) -> None:
+        """Deprecated XBT format should raise with helpful message."""
+        client = KrakenClient(KrakenConfig())
+
+        with pytest.raises(ValueError, match="Deprecated ticker format.*XBT.*Use 'BTC'"):
+            client.validate_tickers(["XBT/USD"])
 
     def test_invalid_ticker_raises(self, mock_asset_pairs: dict) -> None:
         """Invalid ticker should raise ValueError."""
@@ -71,7 +78,7 @@ class TestKrakenTickerValidation:
             mock_market_cls.return_value = mock_market
 
             with pytest.raises(ValueError, match="FAKE/USD"):
-                client.validate_tickers(["XBT/USD", "FAKE/USD"])
+                client.validate_tickers(["BTC/USD", "FAKE/USD"])
 
     def test_empty_tickers_passes(self) -> None:
         """Empty ticker list should not raise or call API."""
