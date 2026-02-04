@@ -133,7 +133,7 @@ class SettingsManager:
         self._yaml.preserve_quotes = True
         self._yaml.indent(mapping=2, sequence=4, offset=2)
 
-    def mark_target_fired(self, ticker: str) -> None:
+    def mark_target_fired(self, ticker: str, target: float) -> None:
         """Mark a target as fired by adding 'fired: true' to the asset in settings.yaml."""
         if not self.settings_path.exists():
             logging.warning("Settings file not found: %s", self.settings_path)
@@ -143,14 +143,16 @@ class SettingsManager:
         with open(self.settings_path, encoding="utf-8") as f:
             data = self._yaml.load(f)
 
-        # Find the asset by ticker and add fired: true
+        # Find the asset by ticker and target, then add fired: true
         assets = data.get("assets", [])
         for asset in assets:
-            if asset.get("ticker") == ticker:
+            if asset.get("ticker") == ticker and asset.get("target") == target:
                 asset["fired"] = True
                 break
         else:
-            logging.warning("Asset with ticker %s not found in settings", ticker)
+            logging.warning(
+                "Asset with ticker %s and target %s not found in settings", ticker, target
+            )
             return
 
         # Write back preserving formatting

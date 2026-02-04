@@ -79,7 +79,7 @@ class AlertHandler:
                 or (ctx.old_price > ctx.monitor.target > ctx.new_price)
             )  # fmt: skip
             if crossed:
-                self._settings_manager.mark_target_fired(ctx.monitor.ticker)
+                self._settings_manager.mark_target_fired(ctx.monitor.ticker, ctx.monitor.target)
                 ctx.monitor.fired = True
                 return ctx.to_alert()
             else:

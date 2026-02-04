@@ -112,6 +112,23 @@ class TestTargetAlerts:
         ctx = PriceContext.create(monitor, old_price=99000, new_price=101000)
         assert alert_handler._check_target(ctx) is None
 
+    def test_marks_correct_target_when_multiple_exist(
+        self, alert_handler: AlertHandler, mock_settings_manager: MagicMock
+    ) -> None:
+        """When same ticker has multiple targets, only the crossed target is marked fired."""
+        monitor_250 = MonitorConfig(name="Apple", client=Client.ALPACA, ticker="AAPL", target=250)
+        monitor_275 = MonitorConfig(name="Apple", client=Client.ALPACA, ticker="AAPL", target=275)
+
+        # Price crosses 250 but not 275
+        ctx_250 = PriceContext.create(monitor_250, old_price=245, new_price=255)
+        ctx_275 = PriceContext.create(monitor_275, old_price=245, new_price=255)
+
+        alert_handler._check_target(ctx_250)
+        alert_handler._check_target(ctx_275)
+
+        # Should only mark the 250 target as fired (with ticker AND target)
+        mock_settings_manager.mark_target_fired.assert_called_once_with("AAPL", 250)
+
 
 class TestCheckAndNotify:
     """Integration test for the full check_and_notify flow."""
