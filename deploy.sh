@@ -90,7 +90,7 @@ cd "\$APPDIR"
   --restart unless-stopped \\
   --env-file "\$APPDIR/.env" \\
   -v "\$APPDIR/logs:/app/logs" \\
-  -v "\$APPDIR/settings.yaml:/app/settings.yaml:ro" \\
+  -v "\$APPDIR/settings.yaml:/app/settings.yaml" \\
   "${IMAGE_NAME}:latest" >/dev/null 2>&1
 EOF
 
