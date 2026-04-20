@@ -40,7 +40,7 @@ class AlertHandler:
             alerts.append((alert, AlertType.PERCENT))
         if alert := self._check_interval(ctx):
             alerts.append((alert, AlertType.INTERVAL))
-        if alert := self._check_target(ctx):
+        if alert := await self._check_target(ctx):
             alerts.append((alert, AlertType.TARGET))
 
         for alert, alert_type in alerts:
@@ -69,7 +69,7 @@ class AlertHandler:
             else:
                 return None
 
-    def _check_target(self, ctx: PriceContext) -> AlertInfo | None:
+    async def _check_target(self, ctx: PriceContext) -> AlertInfo | None:
         """Check if price crossed the target (one-time alert)."""
         if not ctx.monitor.target or ctx.monitor.fired:
             return None
@@ -79,7 +79,9 @@ class AlertHandler:
                 or (ctx.old_price > ctx.monitor.target > ctx.new_price)
             )  # fmt: skip
             if crossed:
-                self._settings_manager.mark_target_fired(ctx.monitor.ticker, ctx.monitor.target)
+                await self._settings_manager.mark_target_fired(
+                    ctx.monitor.ticker, ctx.monitor.target
+                )
                 ctx.monitor.fired = True
                 return ctx.to_alert()
             else:

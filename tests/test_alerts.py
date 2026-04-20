@@ -76,31 +76,35 @@ class TestIntervalAlerts:
 class TestTargetAlerts:
     """One-time target price alerts."""
 
-    def test_triggers_on_crossing_target(
+    @pytest.mark.asyncio
+    async def test_triggers_on_crossing_target(
         self, alert_handler: AlertHandler, target_monitor: MonitorConfig
     ) -> None:
         """Crossing $100k target should trigger."""
         ctx = PriceContext.create(target_monitor, old_price=99000, new_price=101000)
-        alert = alert_handler._check_target(ctx)
+        alert = await alert_handler._check_target(ctx)
 
         assert alert is not None
         assert target_monitor.fired is True  # Should mark as fired
 
-    def test_triggers_on_crossing_down(
+    @pytest.mark.asyncio
+    async def test_triggers_on_crossing_down(
         self, alert_handler: AlertHandler, target_monitor: MonitorConfig
     ) -> None:
         """Crossing target going DOWN should also trigger."""
         ctx = PriceContext.create(target_monitor, old_price=101000, new_price=99000)
-        assert alert_handler._check_target(ctx) is not None
+        assert await alert_handler._check_target(ctx) is not None
 
-    def test_no_trigger_without_crossing(
+    @pytest.mark.asyncio
+    async def test_no_trigger_without_crossing(
         self, alert_handler: AlertHandler, target_monitor: MonitorConfig
     ) -> None:
         """Staying below target should NOT trigger."""
         ctx = PriceContext.create(target_monitor, old_price=95000, new_price=99000)
-        assert alert_handler._check_target(ctx) is None
+        assert await alert_handler._check_target(ctx) is None
 
-    def test_only_fires_once(self, alert_handler: AlertHandler) -> None:
+    @pytest.mark.asyncio
+    async def test_only_fires_once(self, alert_handler: AlertHandler) -> None:
         """Target should NOT fire again after already fired."""
         monitor = MonitorConfig(
             name="BTC",
@@ -110,9 +114,10 @@ class TestTargetAlerts:
             fired=True,  # Already fired
         )
         ctx = PriceContext.create(monitor, old_price=99000, new_price=101000)
-        assert alert_handler._check_target(ctx) is None
+        assert await alert_handler._check_target(ctx) is None
 
-    def test_marks_correct_target_when_multiple_exist(
+    @pytest.mark.asyncio
+    async def test_marks_correct_target_when_multiple_exist(
         self, alert_handler: AlertHandler, mock_settings_manager: MagicMock
     ) -> None:
         """When same ticker has multiple targets, only the crossed target is marked fired."""
@@ -123,8 +128,8 @@ class TestTargetAlerts:
         ctx_250 = PriceContext.create(monitor_250, old_price=245, new_price=255)
         ctx_275 = PriceContext.create(monitor_275, old_price=245, new_price=255)
 
-        alert_handler._check_target(ctx_250)
-        alert_handler._check_target(ctx_275)
+        await alert_handler._check_target(ctx_250)
+        await alert_handler._check_target(ctx_275)
 
         # Should only mark the 250 target as fired (with ticker AND target)
         mock_settings_manager.mark_target_fired.assert_called_once_with("AAPL", 250)

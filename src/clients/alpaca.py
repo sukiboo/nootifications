@@ -4,7 +4,6 @@ import logging
 import time
 import urllib.error
 import urllib.request
-from collections.abc import AsyncIterator
 
 import websockets
 from websockets.asyncio.client import ClientConnection
@@ -17,7 +16,7 @@ logger = logging.getLogger(__name__)
 ALPACA_WS_URL = "wss://stream.data.alpaca.markets/v2/{feed}"
 
 
-class AlpacaClient(BasePriceClient):
+class AlpacaClient(BasePriceClient[AlpacaConfig]):
     """
     Alpaca WebSocket client for real-time US stock trades.
 
@@ -244,51 +243,3 @@ class AlpacaClient(BasePriceClient):
         except Exception as e:
             logger.exception("Alpaca receive loop error: %s", e)
             self._connected = False
-
-    async def price_updates(self) -> AsyncIterator[PriceUpdate]:
-        """
-        Async iterator yielding price updates.
-
-        Handles reconnection on connection loss.
-        """
-        reconnect_attempts = 0
-
-        while True:
-            try:
-                try:
-                    update = await asyncio.wait_for(self._price_queue.get(), timeout=30.0)
-                    reconnect_attempts = 0
-                    yield update
-                except asyncio.TimeoutError:
-                    if not self._connected:
-                        raise RuntimeError("Alpaca WebSocket disconnected")
-                    continue
-
-            except asyncio.CancelledError:
-                logger.info("Alpaca price update stream cancelled")
-                raise
-
-            except Exception as e:
-                logger.error("Error in Alpaca price update stream: %s", e)
-                self._connected = False
-
-                if reconnect_attempts >= self._config.max_reconnect_attempts:
-                    logger.error("Max reconnection attempts reached, giving up")
-                    raise
-
-                reconnect_attempts += 1
-                logger.info(
-                    "Attempting reconnection %d/%d in %ds...",
-                    reconnect_attempts,
-                    self._config.max_reconnect_attempts,
-                    self._config.reconnect_delay,
-                )
-                await asyncio.sleep(self._config.reconnect_delay)
-
-                try:
-                    await self.disconnect()
-                    await self.connect()
-                    if self._subscribed_tickers:
-                        await self.subscribe(self._subscribed_tickers)
-                except Exception as reconnect_error:
-                    logger.error("Reconnection failed: %s", reconnect_error)

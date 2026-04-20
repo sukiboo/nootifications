@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import time
-from collections.abc import AsyncIterator
 from typing import Any
 
 from kraken.spot import Market, SpotWSClient
@@ -12,7 +11,7 @@ from src.schemas import KrakenConfig, PriceUpdate
 logger = logging.getLogger(__name__)
 
 
-class KrakenClient(BasePriceClient):
+class KrakenClient(BasePriceClient[KrakenConfig]):
     """
     Kraken WebSocket client using the official python-kraken-sdk.
 
@@ -103,56 +102,6 @@ class KrakenClient(BasePriceClient):
                 f"Invalid Kraken ticker(s): {invalid}. " "Use format like 'BTC/USD', 'ETH/USD'."
             )
 
-    async def price_updates(self) -> AsyncIterator[PriceUpdate]:
-        """
-        Async iterator yielding price updates.
-
-        Handles reconnection on connection loss.
-        """
-        reconnect_attempts = 0
-
-        while True:
-            try:
-                # Get price update with timeout to allow periodic health checks
-                try:
-                    update = await asyncio.wait_for(self._price_queue.get(), timeout=30.0)
-                    reconnect_attempts = 0  # Reset on successful receive
-                    yield update
-                except asyncio.TimeoutError:
-                    # No update received, but connection might still be alive
-                    # Kraken sends heartbeats, so this is fine
-                    continue
-
-            except asyncio.CancelledError:
-                logger.info("Price update stream cancelled")
-                raise
-
-            except Exception as e:
-                logger.error("Error in price update stream: %s", e)
-                self._connected = False
-
-                if reconnect_attempts >= self._config.max_reconnect_attempts:
-                    logger.error("Max reconnection attempts reached, giving up")
-                    raise
-
-                reconnect_attempts += 1
-                logger.info(
-                    "Attempting reconnection %d/%d in %ds...",
-                    reconnect_attempts,
-                    self._config.max_reconnect_attempts,
-                    self._config.reconnect_delay,
-                )
-
-                await asyncio.sleep(self._config.reconnect_delay)
-
-                try:
-                    await self.disconnect()
-                    await self.connect()
-                    if self._subscribed_tickers:
-                        await self.subscribe(self._subscribed_tickers)
-                except Exception as reconnect_error:
-                    logger.error("Reconnection failed: %s", reconnect_error)
-
 
 class _KrakenWSHandler(SpotWSClient):
     """
@@ -167,8 +116,10 @@ class _KrakenWSHandler(SpotWSClient):
         self._throttle_seconds = throttle_seconds
         self._last_update: dict[str, float] = {}
 
-    async def on_message(self, message: dict[str, Any]) -> None:
+    async def on_message(self, message: dict[str, Any] | list[Any]) -> None:
         """Process incoming WebSocket messages."""
+        if not isinstance(message, dict):
+            return
         # Skip heartbeats and system messages
         if message.get("channel") == "heartbeat":
             return

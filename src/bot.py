@@ -127,12 +127,12 @@ class NootificationsBot:
         reference = self.price_state.get_price(update.ticker)
         if reference is None:
             logger.info("Initial price for %s: $%.2f", monitor.name, price)
-            self.price_state.set_price(update.ticker, price)
+            await self.price_state.set_price(update.ticker, price)
             return
 
         # Check alerts and update reference if any triggered
         if await self.alerts.check_and_notify(monitor, reference, price):
-            self.price_state.set_price(update.ticker, price)
+            await self.price_state.set_price(update.ticker, price)
 
     def _get_smoothing(self, source: str) -> float:
         if source == "kraken":

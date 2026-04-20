@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import time
@@ -97,6 +98,7 @@ class PriceStateManager:
         self.state_file = Path(state_file)
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
         self.state = self._load_state()
+        self._write_lock = asyncio.Lock()
 
     def _load_state(self) -> PriceState:
         """Load state from disk or create empty state."""
@@ -109,19 +111,20 @@ class PriceStateManager:
                 pass
         return PriceState()
 
-    def save(self) -> None:
-        """Persist current state to disk."""
+    def _write(self, payload: str) -> None:
         with open(self.state_file, "w", encoding="utf-8") as f:
-            json.dump(self.state.model_dump(), f, indent=2)
+            f.write(payload)
 
     def get_price(self, ticker: str) -> float | None:
         """Get last recorded price for a ticker."""
         return self.state.get_price(ticker)
 
-    def set_price(self, ticker: str, price: float) -> None:
-        """Update price for a ticker and persist."""
+    async def set_price(self, ticker: str, price: float) -> None:
+        """Update price for a ticker and persist without blocking the event loop."""
         self.state.set_price(ticker, price)
-        self.save()
+        payload = json.dumps(self.state.model_dump(), indent=2)
+        async with self._write_lock:
+            await asyncio.to_thread(self._write, payload)
 
 
 class SettingsManager:
@@ -132,9 +135,14 @@ class SettingsManager:
         self._yaml = YAML()
         self._yaml.preserve_quotes = True
         self._yaml.indent(mapping=2, sequence=4, offset=2)
+        self._write_lock = asyncio.Lock()
 
-    def mark_target_fired(self, ticker: str, target: float) -> None:
-        """Mark a target as fired by adding 'fired: true' to the asset in settings.yaml."""
+    async def mark_target_fired(self, ticker: str, target: float) -> None:
+        """Mark a target as fired in settings.yaml without blocking the event loop."""
+        async with self._write_lock:
+            await asyncio.to_thread(self._mark_target_fired_sync, ticker, target)
+
+    def _mark_target_fired_sync(self, ticker: str, target: float) -> None:
         if not self.settings_path.exists():
             logging.warning("Settings file not found: %s", self.settings_path)
             return
