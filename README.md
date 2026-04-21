@@ -9,6 +9,9 @@ Price monitoring bot that sends Telegram alerts when asset prices move beyond se
 - Three alert types: percentage change, interval crossing, and one-time price targets
 - Persistent price state for crash recovery (not really)
 
+<img width="848" alt="image" src="https://github.com/user-attachments/assets/1e527234-7e0b-4e27-b30d-a604783d8d4c" />
+
+
 ## Configuration
 
 #### Set assets to monitor in `settings.yaml`
