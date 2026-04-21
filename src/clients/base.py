@@ -90,6 +90,11 @@ class BasePriceClient(ABC, Generic[TConfig]):
         """
         ...
 
+    # Hook: subclasses override when the feed has known quiet periods
+    # (e.g. stock markets outside trading hours). Default: always armed.
+    async def should_check_staleness(self) -> bool:
+        return True
+
     async def price_updates(self) -> AsyncIterator[PriceUpdate]:
         """
         Async iterator yielding price updates.
@@ -114,6 +119,11 @@ class BasePriceClient(ABC, Generic[TConfig]):
                 except asyncio.TimeoutError:
                     if not self._connected:
                         raise RuntimeError(f"{self.name} WebSocket disconnected")
+                    if not await self.should_check_staleness():
+                        # Quiet period (e.g. market closed) -- keep the
+                        # watchdog disarmed so it doesn't trip on resume.
+                        last_update_time = time.monotonic()
+                        continue
                     idle = time.monotonic() - last_update_time
                     if idle > self._config.stale_timeout_seconds:
                         raise RuntimeError(

@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import json
 import logging
 import time
@@ -14,6 +15,10 @@ from src.schemas import AlpacaConfig, PriceUpdate
 logger = logging.getLogger(__name__)
 
 ALPACA_WS_URL = "wss://stream.data.alpaca.markets/v2/{feed}"
+ALPACA_API_URLS = (
+    "https://api.alpaca.markets",
+    "https://paper-api.alpaca.markets",
+)
 
 
 class AlpacaClient(BasePriceClient[AlpacaConfig]):
@@ -38,6 +43,12 @@ class AlpacaClient(BasePriceClient[AlpacaConfig]):
         self._subscribed_tickers: list[str] = []
         self._price_queue: asyncio.Queue[PriceUpdate] = asyncio.Queue()
         self._recv_task: asyncio.Task[None] | None = None
+        # The key/secret is scoped to exactly one of live/paper; remember
+        # whichever endpoint actually authenticates so we can reuse it.
+        self._api_base_url: str | None = None
+        # Cached (is_open, unix_expiry_ts) from /v2/clock. Valid until the
+        # next scheduled market-state transition.
+        self._clock_cache: tuple[bool, float] | None = None
 
     @property
     def name(self) -> str:
@@ -143,18 +154,12 @@ class AlpacaClient(BasePriceClient[AlpacaConfig]):
         if not self._api_key or not self._api_secret:
             raise RuntimeError("Alpaca API credentials required for ticker validation")
 
-        # Try live API first, fall back to paper API (keys are endpoint-specific)
-        base_urls = [
-            "https://api.alpaca.markets",
-            "https://paper-api.alpaca.markets",
-        ]
-
         invalid = []
         for ticker in tickers:
             validated = False
             last_error = None
 
-            for base_url in base_urls:
+            for base_url in self._auth_base_urls():
                 url = f"{base_url}/v2/assets/{ticker}"
                 req = urllib.request.Request(
                     url,
@@ -170,10 +175,12 @@ class AlpacaClient(BasePriceClient[AlpacaConfig]):
                         data = json.loads(resp.read().decode())
                         if not data.get("tradable", False):
                             invalid.append(f"{ticker} (not tradable)")
+                        self._api_base_url = base_url
                         validated = True
                         break
                 except urllib.error.HTTPError as e:
                     if e.code == 404:
+                        self._api_base_url = base_url
                         invalid.append(ticker)
                         validated = True
                         break
@@ -189,6 +196,71 @@ class AlpacaClient(BasePriceClient[AlpacaConfig]):
 
         if invalid:
             raise ValueError(f"Invalid Alpaca ticker(s): {invalid}")
+
+    def _auth_base_urls(self) -> tuple[str, ...]:
+        if self._api_base_url:
+            return (self._api_base_url,)
+        return ALPACA_API_URLS
+
+    async def should_check_staleness(self) -> bool:
+        return await self._is_market_open()
+
+    async def _is_market_open(self) -> bool:
+        now = time.time()
+        if self._clock_cache is not None and now < self._clock_cache[1]:
+            return self._clock_cache[0]
+        try:
+            is_open, next_ts = await asyncio.to_thread(self._fetch_clock)
+        except Exception as e:
+            logger.warning("Failed to fetch Alpaca clock: %s", e)
+            if self._clock_cache is not None:
+                return self._clock_cache[0]
+            # Unknown state: default to 'closed' so the watchdog stays
+            # disarmed rather than falsely killing a healthy connection.
+            return False
+        self._clock_cache = (is_open, next_ts)
+        logger.info(
+            "Alpaca market %s; next transition at %s",
+            "open" if is_open else "closed",
+            datetime.datetime.fromtimestamp(next_ts, tz=datetime.timezone.utc).isoformat(),
+        )
+        return is_open
+
+    # Returns (is_open, unix_ts_of_next_transition) from Alpaca's /v2/clock.
+    def _fetch_clock(self) -> tuple[bool, float]:
+        if not self._api_key or not self._api_secret:
+            raise RuntimeError("Alpaca API credentials required for clock query")
+
+        last_error: Exception | None = None
+        for base_url in self._auth_base_urls():
+            url = f"{base_url}/v2/clock"
+            req = urllib.request.Request(
+                url,
+                headers={
+                    "APCA-API-KEY-ID": self._api_key,
+                    "APCA-API-SECRET-KEY": self._api_secret,
+                },
+            )
+            try:
+                with urllib.request.urlopen(
+                    req, timeout=10
+                ) as resp:  # nosec B310 - URL is hardcoded https
+                    data = json.loads(resp.read().decode())
+            except urllib.error.HTTPError as e:
+                if e.code == 401:
+                    last_error = e
+                    continue
+                raise
+            self._api_base_url = base_url
+            is_open = bool(data.get("is_open"))
+            transition = data.get("next_close") if is_open else data.get("next_open")
+            if transition:
+                next_ts = datetime.datetime.fromisoformat(transition).timestamp()
+            else:
+                # Shouldn't happen in practice; fall back to a short refresh.
+                next_ts = time.time() + 300.0
+            return is_open, next_ts
+        raise RuntimeError(f"Alpaca clock API authentication failed: {last_error}")
 
     async def _receive_loop(self) -> None:
         """Process incoming WebSocket messages and queue price updates."""

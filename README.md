@@ -31,6 +31,7 @@ clients:
     throttle_seconds: 10.0      # min seconds between updates per ticker
     reconnect_delay: 5          # seconds between reconnection attempts
     max_reconnect_attempts: 10  # give up after N failures
+    stale_timeout_seconds: 600  # force reconnect if no updates for N seconds
 
   # US stocks monitoring; free Alpaca account is required
   alpaca:
@@ -39,6 +40,7 @@ clients:
     throttle_seconds: 1.0
     reconnect_delay: 5
     max_reconnect_attempts: 10
+    stale_timeout_seconds: 600  # only armed during regular market hours
 
 assets:
   # monitor crypto (no API key is necessary!)
