@@ -239,7 +239,8 @@ class AlpacaClient(BasePriceClient[AlpacaConfig]):
             raise
         except websockets.exceptions.ConnectionClosed as e:
             logger.warning("Alpaca WebSocket closed: %s", e)
-            self._connected = False
         except Exception as e:
             logger.exception("Alpaca receive loop error: %s", e)
+        finally:
+            # Covers the silent-close path where the iterator exits without raising.
             self._connected = False

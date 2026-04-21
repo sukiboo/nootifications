@@ -47,6 +47,9 @@ class KrakenConfig(BaseModel):
     max_reconnect_attempts: int = Field(
         default=10, description="Max reconnection attempts before giving up"
     )
+    stale_timeout_seconds: int = Field(
+        default=600, description="Force reconnect if no updates received in this many seconds"
+    )
 
 
 class AlpacaConfig(BaseModel):
@@ -65,6 +68,9 @@ class AlpacaConfig(BaseModel):
     reconnect_delay: int = Field(default=5, description="Seconds between reconnection attempts")
     max_reconnect_attempts: int = Field(
         default=10, description="Max reconnection attempts before giving up"
+    )
+    stale_timeout_seconds: int = Field(
+        default=600, description="Force reconnect if no updates received in this many seconds"
     )
 
 

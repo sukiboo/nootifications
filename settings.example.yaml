@@ -6,12 +6,14 @@ clients:
     throttle_seconds: 10.0
     reconnect_delay: 5
     max_reconnect_attempts: 10
+    stale_timeout_seconds: 600
   alpaca:
     feed: iex
     smoothing: 0.9
     throttle_seconds: 10.0
     reconnect_delay: 5
     max_reconnect_attempts: 10
+    stale_timeout_seconds: 600
 
 assets:
   - name: ETH

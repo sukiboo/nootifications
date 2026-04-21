@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from typing import Generic, Protocol, TypeVar
@@ -12,6 +13,7 @@ logger = logging.getLogger(__name__)
 class _ReconnectConfig(Protocol):
     max_reconnect_attempts: int
     reconnect_delay: int
+    stale_timeout_seconds: int
 
 
 TConfig = TypeVar("TConfig", bound=_ReconnectConfig)
@@ -100,16 +102,23 @@ class BasePriceClient(ABC, Generic[TConfig]):
                 print(f"{update.ticker}: {update.price}")
         """
         reconnect_attempts = 0
+        last_update_time = time.monotonic()
 
         while True:
             try:
                 try:
                     update = await asyncio.wait_for(self._price_queue.get(), timeout=30.0)
                     reconnect_attempts = 0
+                    last_update_time = time.monotonic()
                     yield update
                 except asyncio.TimeoutError:
                     if not self._connected:
                         raise RuntimeError(f"{self.name} WebSocket disconnected")
+                    idle = time.monotonic() - last_update_time
+                    if idle > self._config.stale_timeout_seconds:
+                        raise RuntimeError(
+                            f"{self.name} WebSocket stale -- no updates in {int(idle)}s"
+                        )
                     continue
 
             except asyncio.CancelledError:
@@ -138,5 +147,6 @@ class BasePriceClient(ABC, Generic[TConfig]):
                     await self.connect()
                     if self._subscribed_tickers:
                         await self.subscribe(self._subscribed_tickers)
+                    last_update_time = time.monotonic()
                 except Exception as reconnect_error:
                     logger.error("Reconnection failed: %s", reconnect_error)
