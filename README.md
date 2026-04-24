@@ -83,6 +83,8 @@ Each asset must have at least one alert type. You can combine multiple types on 
 | `kraken` | Crypto    | `BTC/USD`, etc. | No (spot WebSocket)   |
 | `alpaca` | US stocks | `AAPL`, `MSFT`  | Yes (free, see below) |
 
+**Alpaca feed hours.** The free `iex` feed only streams trades that print on the IEX exchange (~2% of US volume) and is live roughly 8:00–17:00 ET (pre-market, regular, and early post-market). Overnight and the 17:00–20:00 post-market window are not covered. The paid `sip` feed ($99/mo) streams all US exchanges from ~4:00–20:00 ET. Regardless of feed, the stale-connection watchdog is only armed during regular hours (9:30–16:00 ET) — so a silent WS drop during pre/post won't auto-reconnect until the market opens.
+
 #### Required secrets in **`.env`**
 
 Set your Telegram bot credentials for the alerts:
